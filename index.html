@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ตรวจสอบสถานะคำสั่งซื้อ | Tracking Status</title>
+
+<!-- Thai font -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --brand-red:#e0202e;
+    --brand-red-dark:#b3161f;
+    --brand-red-light:#ff4d57;
+    --ink:#1f2024;
+    --muted:#70737c;
+    --bg:#f7f7f9;
+    --line:#ececef;
+    --ok:#1a9c5a;
+    --ok-bg:#e7f7ee;
+    --warn:#b8790a;
+    --warn-bg:#fdf1de;
+    --info:#1466c9;
+    --info-bg:#e9f1fd;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    font-family:'Prompt', system-ui, sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .hero{
+    background:linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-dark) 100%);
+    color:#fff;
+    padding:56px 20px 96px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+  }
+  .hero::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(255,255,255,.12) 0, transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(255,255,255,.10) 0, transparent 45%);
+    pointer-events:none;
+  }
+  .hero-icon{
+    width:56px; height:56px;
+    margin:0 auto 18px;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.15);
+    border-radius:16px;
+    position:relative; z-index:1;
+  }
+  .hero h1{
+    font-size:26px;
+    font-weight:700;
+    margin:0 0 10px;
+    line-height:1.4;
+    position:relative; z-index:1;
+  }
+  .hero p{
+    font-size:14.5px;
+    margin:0;
+    opacity:.92;
+    max-width:480px;
+    margin-inline:auto;
+    position:relative; z-index:1;
+  }
+
+  .wrap{
+    max-width:640px;
+    margin:0 auto;
+    padding:0 20px 60px;
+  }
+
+  .search-card{
+    background:#fff;
+    border-radius:20px;
+    box-shadow:0 12px 32px rgba(0,0,0,.10);
+    padding:22px;
+    margin-top:-64px;
+    position:relative;
+    z-index:2;
+  }
+
+  .field-label{
+    font-size:13px;
+    font-weight:500;
+    color:var(--muted);
+    margin-bottom:8px;
+    display:block;
+  }
+
+  .input-row{
+    display:flex;
+    gap:10px;
+  }
+
+  #phoneInput{
+    flex:1;
+    min-width:0;
+    font-family:inherit;
+    font-size:16px;
+    padding:14px 16px;
+    border:1.5px solid var(--line);
+    border-radius:12px;
+    outline:none;
+    transition:border-color .15s, box-shadow .15s;
+    letter-spacing:.5px;
+  }
+  #phoneInput:focus{
+    border-color:var(--brand-red);
+    box-shadow:0 0 0 4px rgba(224,32,46,.12);
+  }
+  #phoneInput.input-error{
+    border-color:var(--brand-red);
+  }
+
+  #searchBtn{
+    background:var(--brand-red);
+    color:#fff;
+    border:none;
+    font-family:inherit;
+    font-size:15.5px;
+    font-weight:600;
+    padding:14px 22px;
+    border-radius:12px;
+    cursor:pointer;
+    white-space:nowrap;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    transition:background .15s, transform .05s;
+  }
+  #searchBtn:hover{ background:var(--brand-red-dark); }
+  #searchBtn:active{ transform:scale(.97); }
+  #searchBtn:disabled{ opacity:.65; cursor:not-allowed; }
+
+  .error-text{
+    color:var(--brand-red);
+    font-size:13px;
+    margin-top:8px;
+    min-height:16px;
+  }
+
+  .hint{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:10px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+
+  /* Result states */
+  .state-panel{
+    margin-top:22px;
+    text-align:center;
+    padding:40px 16px;
+    display:none;
+  }
+  .state-panel.show{ display:block; }
+
+  .spinner{
+    width:38px; height:38px;
+    border:3.5px solid #f0d3d5;
+    border-top-color:var(--brand-red);
+    border-radius:50%;
+    margin:0 auto 14px;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .state-title{ font-weight:600; font-size:15px; margin-bottom:4px; }
+  .state-sub{ font-size:13px; color:var(--muted); }
+
+  .state-emoji{ font-size:34px; margin-bottom:10px; }
+
+  /* Results list */
+  #resultsList{
+    margin-top:22px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+
+  .order-card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:18px;
+    animation:fadeUp .35s ease both;
+  }
+  @keyframes fadeUp{
+    from{ opacity:0; transform:translateY(8px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  .order-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+    margin-bottom:12px;
+  }
+
+  .cust-name{ font-weight:600; font-size:15px; }
+  .cust-phone{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+
+  .status-badge{
+    font-size:12px;
+    font-weight:600;
+    padding:5px 12px;
+    border-radius:999px;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .badge-ok{ background:var(--ok-bg); color:var(--ok); }
+  .badge-warn{ background:var(--warn-bg); color:var(--warn); }
+  .badge-info{ background:var(--info-bg); color:var(--info); }
+  .badge-default{ background:#eef0f2; color:#565962; }
+
+  .order-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px 14px;
+    font-size:13px;
+    margin-bottom:14px;
+  }
+  .order-grid .lbl{ color:var(--muted); font-size:11.5px; margin-bottom:2px; }
+  .order-grid .val{ font-weight:500; }
+
+  .track-btn{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    width:100%;
+    background:var(--ink);
+    color:#fff;
+    text-decoration:none;
+    font-size:14px;
+    font-weight:600;
+    padding:12px 14px;
+    border-radius:12px;
+    transition:background .15s;
+  }
+  .track-btn:hover{ background:#000; }
+  .track-btn.fallback{
+    background:#fff;
+    color:var(--ink);
+    border:1.5px solid var(--line);
+  }
+  .track-btn.fallback:hover{ background:#f4f4f5; }
+
+  .copy-toast{
+    position:fixed;
+    left:50%; bottom:24px;
+    transform:translateX(-50%) translateY(12px);
+    background:var(--ink);
+    color:#fff;
+    font-size:13px;
+    padding:10px 18px;
+    border-radius:999px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .2s, transform .2s;
+    z-index:50;
+  }
+  .copy-toast.show{
+    opacity:1;
+    transform:translateX(-50%) translateY(0);
+  }
+
+  .pdpa-note{
+    text-align:center;
+    font-size:11.5px;
+    color:var(--muted);
+    margin-top:24px;
+    line-height:1.6;
+  }
+
+  @media (max-width:400px){
+    .input-row{ flex-direction:column; }
+    #searchBtn{ justify-content:center; }
+    .order-grid{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+  <section class="hero">
+    <div class="hero-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5v-9z" stroke="white" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M3 7.5L12 12l9-4.5M12 12v9" stroke="white" stroke-width="1.6" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h1>ระบบตรวจสอบสถานะ<br>คำสั่งซื้อและเลขพัสดุ</h1>
+    <p>กรอกเบอร์โทรศัพท์ที่ใช้สั่งซื้อ เพื่อตรวจสอบสถานะการจัดส่งของคุณ</p>
+  </section>
+
+  <main class="wrap">
+    <div class="search-card">
+      <label class="field-label" for="phoneInput">กรอกเบอร์โทรศัพท์</label>
+      <div class="input-row">
+        <input
+          type="tel"
+          id="phoneInput"
+          placeholder="0812345678"
+          inputmode="numeric"
+          maxlength="10"
+          autocomplete="tel"
+        >
+        <button id="searchBtn">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="11" cy="11" r="7" stroke="white" stroke-width="2"/>
+            <path d="M21 21l-4.3-4.3" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span>ค้นหา</span>
+        </button>
+      </div>
+      <div class="error-text" id="phoneError"></div>
+      <div class="hint">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="9" stroke="#70737c" stroke-width="1.6"/>
+          <path d="M12 11v5M12 8h.01" stroke="#70737c" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        ข้อมูลจะถูกปกปิดบางส่วนเพื่อความปลอดภัย (PDPA)
+      </div>
+    </div>
+
+    <!-- Loading state -->
+    <div class="state-panel" id="loadingState">
+      <div class="spinner"></div>
+      <div class="state-title">กำลังค้นหาข้อมูล...</div>
+      <div class="state-sub">กรุณารอสักครู่</div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="state-panel" id="emptyState">
+      <div class="state-emoji">📭</div>
+      <div class="state-title">ไม่พบข้อมูลสำหรับเบอร์โทรศัพท์นี้</div>
+      <div class="state-sub">กรุณาตรวจสอบเบอร์โทรศัพท์อีกครั้ง</div>
+    </div>
+
+    <!-- Error state -->
+    <div class="state-panel" id="errorState">
+      <div class="state-emoji">⚠️</div>
+      <div class="state-title">เกิดข้อผิดพลาดในการเชื่อมต่อ</div>
+      <div class="state-sub">ไม่สามารถเชื่อมต่อกับระบบได้ กรุณาลองใหม่อีกครั้ง</div>
+    </div>
+
+    <!-- Results -->
+    <div id="resultsList"></div>
+
+    <div class="pdpa-note">
+      ข้อมูลชื่อและเบอร์โทรศัพท์แสดงผลบางส่วนตามนโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA)<br>
+      หากมีข้อสงสัยกรุณาติดต่อฝ่ายบริการลูกค้า
+    </div>
+  </main>
+
+  <div class="copy-toast" id="copyToast">คัดลอกเลขพัสดุแล้ว</div>
+
+<script>
+(function(){
+
+  /* ============================================================
+     CONFIG — แก้ไข URL นี้ให้ตรงกับ Backend API ของคุณ
+     ตัวอย่าง: PHP endpoint ที่รับ query string ?phone=xxxxxxxxxx
+     และคืนค่าเป็น JSON ตามรูปแบบที่ระบุด้านล่าง (ดูคำอธิบายท้ายไฟล์)
+  ============================================================ */
+  const API_URL = "https://script.google.com/macros/s/AKfycbwmPUz67HppPFHfyLIZ-Cgf2Mx2c3ovIxmJgZ1zUlDEZG-xvGpJSWj-HuY1joIFqyasmQ/exec";
+
+  /* ============================================================
+     DOM references
+  ============================================================ */
+  const phoneInput   = document.getElementById('phoneInput');
+  const searchBtn     = document.getElementById('searchBtn');
+  const phoneError    = document.getElementById('phoneError');
+  const loadingState  = document.getElementById('loadingState');
+  const emptyState    = document.getElementById('emptyState');
+  const errorState    = document.getElementById('errorState');
+  const resultsList   = document.getElementById('resultsList');
+  const copyToast     = document.getElementById('copyToast');
+
+  /* ============================================================
+     Helpers: state management
+  ============================================================ */
+  function hideAllStates(){
+    loadingState.classList.remove('show');
+    emptyState.classList.remove('show');
+    errorState.classList.remove('show');
+    resultsList.innerHTML = '';
+  }
+
+  function setLoading(isLoading){
+    searchBtn.disabled = isLoading;
+    if(isLoading){
+      hideAllStates();
+      loadingState.classList.add('show');
+    } else {
+      loadingState.classList.remove('show');
+    }
+  }
+
+  /* ============================================================
+     Helpers: PDPA masking
+  ============================================================ */
+  function maskName(fullName){
+    if(!fullName) return 'คุณ ลูกค้า';
+    const parts = fullName.trim().split(/\s+/);
+    const firstName = parts[0] || '';
+    const visible = firstName.slice(0, 3);
+    return `คุณ ${visible}...`;
+  }
+
+  function maskPhone(phone){
+    if(!phone) return '-';
+    const digits = String(phone).replace(/\D/g, '');
+    if(digits.length < 10) return digits;
+    const start = digits.slice(0, 3);
+    const end = digits.slice(-4);
+    return `${start}-XXX-${end}`;
+  }
+
+  /* ============================================================
+     Helpers: phone validation (Thai mobile: 0XXXXXXXXX, 10 digits)
+  ============================================================ */
+  function isValidPhone(phone){
+    return /^0[0-9]{9}$/.test(phone);
+  }
+
+  /* ============================================================
+     Helpers: courier tracking link builder
+  ============================================================ */
+  function getCourierLink(courierName, trackingNumber){
+    const name = (courierName || '').trim().toLowerCase();
+    const tn = encodeURIComponent(trackingNumber || '');
+
+    if(name === 'flash'){
+      return { url: `https://www.flashexpress.co.th/tracking/?se=${tn}`, hasLink: true };
+    }
+    if(name === 'j&t' || name === 'jt' || name === 'j&t express'){
+      return { url: `https://www.jtexpress.co.th/index/query/gzquery.html?bills=${tn}`, hasLink: true };
+    }
+    if(name === 'ems' || name === 'ไปรษณีย์ไทย' || name === 'thailand post'){
+      return { url: `https://track.thailandpost.co.th/?trackNumber=${tn}`, hasLink: true };
+    }
+    if(name === 'kerry' || name === 'kerry express'){
+      return { url: `https://th.kerryexpress.com/th/track/?track=${tn}`, hasLink: true };
+    }
+    // Fallback: no known courier match
+    return { url: null, hasLink: false };
+  }
+
+  /* ============================================================
+     Helpers: order status badge styling
+  ============================================================ */
+  function getStatusBadgeClass(status){
+    const s = (status || '');
+    if(s.includes('จัดส่งแล้ว') || s.includes('สำเร็จ')) return 'badge-ok';
+    if(s.includes('เตรียม')) return 'badge-warn';
+    if(s.includes('กำลังจัดส่ง') || s.includes('ระหว่างขนส่ง')) return 'badge-info';
+    return 'badge-default';
+  }
+
+  /* ============================================================
+     Copy to clipboard (fallback for unmatched couriers)
+  ============================================================ */
+  function copyToClipboard(text){
+    const done = () => {
+      copyToast.classList.add('show');
+      setTimeout(() => copyToast.classList.remove('show'), 1800);
+    };
+    if(navigator.clipboard && window.isSecureContext){
+      navigator.clipboard.writeText(text).then(done).catch(done);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch(e){}
+      document.body.removeChild(ta);
+      done();
+    }
+  }
+  window.__copyTrackingNumber = copyToClipboard; // exposed for inline onclick
+
+  /* ============================================================
+     Render results
+  ============================================================ */
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+  }
+
+  function renderResults(orders){
+    hideAllStates();
+
+    if(!orders || orders.length === 0){
+      emptyState.classList.add('show');
+      return;
+    }
+
+    const html = orders.map(order => {
+      const maskedName  = escapeHtml(maskName(order.customer_name));
+      const maskedPhone = escapeHtml(maskPhone(order.customer_phone));
+      const orderId     = escapeHtml(order.order_id || '-');
+      const trackingNo  = escapeHtml(order.tracking_number || '-');
+      const courier     = escapeHtml(order.courier_name || 'ไม่ระบุขนส่ง');
+      const status      = escapeHtml(order.order_status || 'ไม่ทราบสถานะ');
+      const badgeClass  = getStatusBadgeClass(order.order_status);
+
+      const courierLink = getCourierLink(order.courier_name, order.tracking_number);
+
+      const trackBtnHtml = courierLink.hasLink
+        ? `<a class="track-btn" href="${courierLink.url}" target="_blank" rel="noopener noreferrer">
+             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+               <path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5v-9z" stroke="white" stroke-width="1.6" stroke-linejoin="round"/>
+               <path d="M3 7.5L12 12l9-4.5M12 12v9" stroke="white" stroke-width="1.6" stroke-linejoin="round"/>
+             </svg>
+             ติดตามพัสดุกับ ${courier}
+           </a>`
+        : `<button class="track-btn fallback" onclick="window.__copyTrackingNumber('${trackingNo.replace(/'/g, "\\'")}')">
+             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+               <rect x="9" y="9" width="11" height="11" rx="2" stroke="#1f2024" stroke-width="1.6"/>
+               <path d="M5 15V6a2 2 0 012-2h9" stroke="#1f2024" stroke-width="1.6"/>
+             </svg>
+             คัดลอกเลขพัสดุ (${trackingNo})
+           </button>`;
+
+      return `
+        <div class="order-card">
+          <div class="order-top">
+            <div>
+              <div class="cust-name">${maskedName}</div>
+              <div class="cust-phone">${maskedPhone}</div>
+            </div>
+            <span class="status-badge ${badgeClass}">${status}</span>
+          </div>
+          <div class="order-grid">
+            <div>
+              <div class="lbl">เลขที่คำสั่งซื้อ</div>
+              <div class="val">${orderId}</div>
+            </div>
+            <div>
+              <div class="lbl">ขนส่ง</div>
+              <div class="val">${courier}</div>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <div class="lbl">เลขพัสดุ</div>
+              <div class="val">${trackingNo}</div>
+            </div>
+          </div>
+          ${trackBtnHtml}
+        </div>
+      `;
+    }).join('');
+
+    resultsList.innerHTML = html;
+  }
+
+  /* ============================================================
+     API call
+  ============================================================ */
+  async function searchTracking(phone){
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_URL}?phone=${encodeURIComponent(phone)}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+
+      if(!response.ok){
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const json = await response.json();
+
+      /* Expected backend JSON contract:
+         {
+           "success": true,
+           "data": [ { customer_phone, customer_name, order_id,
+                       tracking_number, courier_name, order_status }, ... ]
+         }
+      */
+      setLoading(false);
+
+      if(json.success === false){
+        hideAllStates();
+        errorState.classList.add('show');
+        return;
+      }
+
+      const orders = Array.isArray(json.data) ? json.data : [];
+      renderResults(orders);
+
+    } catch(err){
+      console.error('Tracking lookup failed:', err);
+      setLoading(false);
+      hideAllStates();
+      errorState.classList.add('show');
+    }
+  }
+
+  /* ============================================================
+     Input handling & validation
+  ============================================================ */
+  phoneInput.addEventListener('input', () => {
+    // strip non-digits, cap at 10 chars
+    phoneInput.value = phoneInput.value.replace(/\D/g, '').slice(0, 10);
+    phoneInput.classList.remove('input-error');
+    phoneError.textContent = '';
+  });
+
+  phoneInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') handleSearch();
+  });
+
+  searchBtn.addEventListener('click', handleSearch);
+
+  function handleSearch(){
+    const phone = phoneInput.value.trim();
+
+    if(!isValidPhone(phone)){
+      phoneInput.classList.add('input-error');
+      phoneError.textContent = 'กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (ตัวเลข 10 หลัก เริ่มต้นด้วย 0)';
+      hideAllStates();
+      return;
+    }
+
+    phoneError.textContent = '';
+    searchTracking(phone);
+  }
+
+})();
+</script>
+
+</body>
+</html>
